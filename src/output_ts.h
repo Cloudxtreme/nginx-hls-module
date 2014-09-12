@@ -22,6 +22,8 @@
 //#define PAT_DELTA (100 * (90000 / 1000))
 #define PAT_DELTA (60 * 1000 * (90000 / 1000))
 
+#include "redefine.h"
+
 static void write_pts(uint8_t *q, int fourbits, int64_t pts) {
   int val = val = fourbits << 4 | (((pts >> 30) & 0x07) << 1) | 1;
   *q++ = val;
@@ -35,7 +37,8 @@ static void write_pts(uint8_t *q, int fourbits, int64_t pts) {
 
 static u_int convert_to_nal(unsigned char const *first,
                             unsigned char const *last,
-                            unsigned char *dst) {
+                            unsigned char *dst,
+                            int skip_aud) {
 #if 1
   // check if data is already in nal format. Shouldn't be necessary and this
   // is only a hack for Live Smooth Streaming
@@ -51,7 +54,7 @@ static u_int convert_to_nal(unsigned char const *first,
     first += 4;
 
     uint32_t nal_type = first[0] & 0x1f;
-    if (nal_type != 9) {
+    if (skip_aud || nal_type != 9) {
       write_32(dst, 0x00000001);
       dst += 4;
       memcpy(dst, first, packet_len);
@@ -602,12 +605,22 @@ static void write_video_packet(mpegts_stream_t *mpegts_stream,
                                unsigned char const *first,
                                unsigned char const *last) {
 
+  int skip_aud = 0;
   static const unsigned char aud_nal[6] = {
     0x00, 0x00, 0x00, 0x01, 0x09, 0xe0
   };
 
+  if ((first[4] & 0x1f) == 9) {
+    skip_aud = 1;
+  }
+
   u_int size;
-  size = last - first + sizeof(aud_nal);
+  if (skip_aud) {
+    size = last - first;
+  }
+  else {
+    size = last - first + sizeof(aud_nal);
+  }
 
   //if(size < 50) return;
 
@@ -620,8 +633,10 @@ static void write_video_packet(mpegts_stream_t *mpegts_stream,
   if(buf == NULL) return;
   unsigned char *p = buf;
 
-  memcpy(p, aud_nal, sizeof(aud_nal));
-  p += sizeof(aud_nal);
+  if (!skip_aud) {
+    memcpy(p, aud_nal, sizeof(aud_nal));
+    p += sizeof(aud_nal);
+  }
 
   if(mpegts_stream->packets_ == 0) {
     // sps
@@ -637,7 +652,7 @@ static void write_video_packet(mpegts_stream_t *mpegts_stream,
     p += mpegts_stream->sample_entry_->pps_length_;
   }
 
-  if(convert_to_nal(first, last, p)) {
+  if(convert_to_nal(first, last, p, skip_aud)) {
     write_packet(mpegts_stream, bucket, dts, pts, buf, size);
   }
 
