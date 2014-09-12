@@ -1659,6 +1659,7 @@ static int trak_build_index(mp4_context_t const *mp4_context, trak_t *trak) {
   uint64_t pts = 0;
   unsigned int entries = stts->entries_;
   unsigned int j;
+
   for(j = 0; j < entries; j++) {
     unsigned int i;
     unsigned int sample_count = stts->table_[j].sample_count_;

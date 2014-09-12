@@ -50,12 +50,15 @@ static u_int convert_to_nal(unsigned char const *first,
     if(packet_len > (uint32_t)(last - first)) return 0;
     first += 4;
 
-    write_32(dst, 0x00000001);
-    dst += 4;
+    uint32_t nal_type = first[0] & 0x1f;
+    if (nal_type != 9) {
+      write_32(dst, 0x00000001);
+      dst += 4;
+      memcpy(dst, first, packet_len);
+      dst += packet_len;
+    }
 
-    memcpy(dst, first, packet_len);
     first += packet_len;
-    dst += packet_len;
   }
   return 1;
 }
@@ -567,10 +570,13 @@ static void write_packet(mpegts_stream_t *mpegts_stream,
     buf += TS_PACKET_SIZE;
   }
 
-  if(buf != (unsigned char const *)out_buf + out_size) {
-    printf("write_packet: incorrect number of packets\n");
+  uint n;
+  uint chunk_size;
+  for (n = 0; n < out_size; n += 1024) {
+    chunk_size = out_size - n > 1024? 1024 : out_size - n;
+    bucket_insert(bucket, out_buf + n, chunk_size);
   }
-  bucket_insert(bucket, out_buf, out_size);
+
   free(out_buf);
 }
 
@@ -595,12 +601,15 @@ static void write_video_packet(mpegts_stream_t *mpegts_stream,
                                uint64_t dts, uint64_t pts,
                                unsigned char const *first,
                                unsigned char const *last) {
+
   static const unsigned char aud_nal[6] = {
     0x00, 0x00, 0x00, 0x01, 0x09, 0xe0
   };
 
-  u_int size = last - first + sizeof(aud_nal);
-  if(size < 50) return;
+  u_int size;
+  size = last - first + sizeof(aud_nal);
+
+  //if(size < 50) return;
 
   if(mpegts_stream->packets_ == 0) {
     size += 4 + mpegts_stream->sample_entry_->sps_length_ +
@@ -796,10 +805,10 @@ int output_ts(struct mp4_context_t *mp4_context, struct bucket_t *bucket, struct
 
     int order = -1;
     while(1) {
-      u_int to_break = 1;
+      u_int to_break = 0;
       for(i = 0; i < fragment_size; ++i) {
         if(fragment[i].trak == NULL) continue;
-        if(fragment[i].first != fragment[i].last) to_break = 0;
+        if(fragment[i].first == fragment[i].last && to_break ==0) to_break = 1;
       }
       if(to_break) break;
 

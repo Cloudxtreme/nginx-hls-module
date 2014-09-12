@@ -57,7 +57,6 @@ static char *ngx_http_hls_merge_conf(ngx_conf_t *cf, void *parent, void *child) 
     return NGX_CONF_OK;
 }
 
-
 static ngx_int_t ngx_streaming_handler(ngx_http_request_t *r) {
   size_t                      root;
   ngx_int_t                   rc;
@@ -91,8 +90,6 @@ static ngx_int_t ngx_streaming_handler(ngx_http_request_t *r) {
     return NGX_HTTP_INTERNAL_SERVER_ERROR;
   }
 
-  ngx_log_t *nlog = r->connection->log;
-
   u_int m3u8 = 0;
 
   struct bucket_t *bucket = bucket_init(r);
@@ -106,6 +103,7 @@ static ngx_int_t ngx_streaming_handler(ngx_http_request_t *r) {
     path.data[path.len] = '\0';
   }
 
+  ngx_log_t *nlog = r->connection->log;
   ngx_log_debug1(NGX_LOG_DEBUG_HTTP, nlog, 0, "http mp4 filename: \"%s\"", path.data);
 
   clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
@@ -208,15 +206,19 @@ static ngx_int_t ngx_streaming_handler(ngx_http_request_t *r) {
     r->headers_out.content_length_n = bucket->content_length;
     r->headers_out.last_modified_time = of.mtime;
 
-    ngx_table_elt_t *h = ngx_list_push(&r->headers_out.headers);
-    if(h == NULL) return NGX_HTTP_INTERNAL_SERVER_ERROR;
+    if (ngx_http_set_content_type(r) != NGX_OK) {
+      return NGX_HTTP_INTERNAL_SERVER_ERROR;
+    }
 
-    h->hash = 1;
+    //ngx_table_elt_t *h = ngx_list_push(&r->headers_out.headers);
+    //if(h == NULL) return NGX_HTTP_INTERNAL_SERVER_ERROR;
 
-    h->key.len = sizeof(X_MOD_HLS_KEY) - 1;
-    h->key.data = (u_char *)X_MOD_HLS_KEY;
-    h->value.len = sizeof(X_MOD_HLS_VERSION) - 1;
-    h->value.data = (u_char *)X_MOD_HLS_VERSION;
+    //h->hash = 1;
+
+    //h->key.len = sizeof(X_MOD_HLS_KEY) - 1;
+    //h->key.data = (u_char *)X_MOD_HLS_KEY;
+    //h->value.len = sizeof(X_MOD_HLS_VERSION) - 1;
+    //h->value.data = (u_char *)X_MOD_HLS_VERSION;
 
     rc = ngx_http_send_header(r);
 
