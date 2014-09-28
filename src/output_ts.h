@@ -22,8 +22,6 @@
 //#define PAT_DELTA (100 * (90000 / 1000))
 #define PAT_DELTA (60 * 1000 * (90000 / 1000))
 
-#include "redefine.h"
-
 static void write_pts(uint8_t *q, int fourbits, int64_t pts) {
   int val = val = fourbits << 4 | (((pts >> 30) & 0x07) << 1) | 1;
   *q++ = val;
