@@ -179,7 +179,8 @@ static ngx_int_t ngx_streaming_handler(ngx_http_request_t *r) {
       view_count(mp4_context, (char *)path.data, options ? options->hash : NULL, action);
     }
     r->allow_ranges = 0;
-    r->headers_out.content_type.data = "application/vnd.apple.mpegurl";
+    // dirty hack
+    r->headers_out.content_type.data = (u_char *)"application/vnd.apple.mpegurl";
     r->headers_out.content_type.len = 29;
     r->headers_out.content_type_len = r->headers_out.content_type.len;
   } else {
@@ -208,6 +209,8 @@ static ngx_int_t ngx_streaming_handler(ngx_http_request_t *r) {
     r->headers_out.status = NGX_HTTP_OK;
     r->headers_out.content_length_n = bucket->content_length;
     r->headers_out.last_modified_time = of.mtime;
+    
+    if(ngx_http_set_content_type(r) != NGX_OK) return NGX_HTTP_INTERNAL_SERVER_ERROR;
 
     if (ngx_http_set_content_type(r) != NGX_OK) {
       return NGX_HTTP_INTERNAL_SERVER_ERROR;
